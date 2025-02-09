@@ -1,18 +1,22 @@
 import 'dart:collection';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
-import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For loading assets
+import 'package:flutter/services.dart'; // For loading assets (if needed)
 import 'package:image/image.dart' as imgLib;
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'dart:html' as html; // For web only, consider using conditional imports
 
 void main() {
-  runApp(MaterialApp(home: ImageColorSwapApp()));
+  runApp(
+    MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: ImageColorSwapApp(),
+    ),
+  );
 }
 
 class ImageColorSwapApp extends StatefulWidget {
@@ -36,22 +40,33 @@ class _ImageColorSwapAppState extends State<ImageColorSwapApp> {
   @override
   void initState() {
     super.initState();
-    loadAssetImage();
+    // Do not load an asset by default.
+    // The user will select an image via the file picker.
   }
 
-  /// Loads an image from assets and decodes it.
-  Future<void> loadAssetImage() async {
-    ByteData imageData = await rootBundle.load('assets/sample.png');
-    Uint8List bytes = imageData.buffer.asUint8List();
-    originalImage = imgLib.decodeImage(bytes);
-
-    if (originalImage != null) {
-      // Ensure the image has 4 channels (RGBA).
-      originalImage = originalImage!.convert(numChannels: 4, alpha: 255);
-      setState(() {
-        displayedImageBytes =
-            Uint8List.fromList(imgLib.encodePng(originalImage!));
-      });
+  /// Uses a file picker to let the user choose an image.
+  Future<void> pickImage() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+    );
+    if (result != null) {
+      Uint8List? fileBytes = result.files.first.bytes;
+      // If fileBytes is null (e.g. on desktop), try using the file path.
+      if (fileBytes == null && result.files.first.path != null) {
+        File file = File(result.files.first.path!);
+        fileBytes = await file.readAsBytes();
+      }
+      if (fileBytes != null) {
+        imgLib.Image? img = imgLib.decodeImage(fileBytes);
+        if (img != null) {
+          // Ensure we have a 4-channel (RGBA) image.
+          originalImage = img.convert(numChannels: 4, alpha: 255);
+          setState(() {
+            displayedImageBytes =
+                Uint8List.fromList(imgLib.encodePng(originalImage!));
+          });
+        }
+      }
     }
   }
 
@@ -83,7 +98,7 @@ class _ImageColorSwapAppState extends State<ImageColorSwapApp> {
   }
 
   /// Posterizes the image by reducing each channel to a specified number of levels.
-  /// This can help reduce the smooth color transitions caused by antialiasing.
+  /// This helps to reduce the smooth transitions caused by antialiasing.
   void posterizeImage(imgLib.Image image, int levels) {
     double step = 255 / (levels - 1);
     for (int y = 0; y < image.height; y++) {
@@ -143,7 +158,7 @@ class _ImageColorSwapAppState extends State<ImageColorSwapApp> {
     await showDialog(
       context: context,
       builder: (context) {
-        // Use StatefulBuilder to update dialog state.
+        // Use StatefulBuilder to update the dialog state.
         return StatefulBuilder(builder: (context, setStateDialog) {
           return AlertDialog(
             title: Text('Pick Replacement Color'),
@@ -151,7 +166,7 @@ class _ImageColorSwapAppState extends State<ImageColorSwapApp> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // The color picker.
+                  // The ColorPicker widget.
                   ColorPicker(
                     pickerColor: selectedColor,
                     onColorChanged: (color) {
@@ -239,8 +254,7 @@ class _ImageColorSwapAppState extends State<ImageColorSwapApp> {
 
     // Create a posterized clone of the original image to reduce antialiasing effects.
     imgLib.Image processedImage = originalImage!.clone();
-    posterizeImage(
-        processedImage, 4); // Adjust levels (e.g., 4 or 8) as needed.
+    posterizeImage(processedImage, 4); // Adjust levels as needed.
 
     // Use the posterized image for flood fill region detection.
     final imgLib.Pixel tappedPixel = processedImage.getPixel(imgX, imgY);
@@ -260,10 +274,9 @@ class _ImageColorSwapAppState extends State<ImageColorSwapApp> {
       });
     }
 
-    // Compute the flood filled region on the posterized image.
+    // Compute the flood-filled region on the posterized image.
     final Set<Point<int>> region =
         floodFillRegion(processedImage, imgX, imgY, targetColorInt, tolerance);
-
     int newColorInt = colorToInt(newColor);
 
     // Update the corresponding pixels in the original image.
@@ -284,7 +297,6 @@ class _ImageColorSwapAppState extends State<ImageColorSwapApp> {
   /// Applies a Gaussian blur to the current image and updates the display.
   void applyGaussianBlur() {
     if (originalImage == null) return;
-    // Apply Gaussian blur with a radius of 2 (adjust as needed).
     originalImage = imgLib.gaussianBlur(originalImage!, radius: 1);
     setState(() {
       displayedImageBytes =
@@ -293,46 +305,28 @@ class _ImageColorSwapAppState extends State<ImageColorSwapApp> {
   }
 
   /// Saves the current displayed image as a PNG file.
-
+  /// (It applies a Gaussian blur to a clone of the image before saving.)
   Future<void> saveImage() async {
     if (originalImage == null) return;
     try {
-      final imgLib.Image antialiasedImage = originalImage!.clone();
-      final Uint8List antialiasedBytes =
+      // Clone the current modified image.
+      imgLib.Image antialiasedImage = originalImage!.clone();
+      // Apply a Gaussian blur (adjust the radius as needed).
+      Uint8List antialiasedBytes =
           Uint8List.fromList(imgLib.encodePng(antialiasedImage));
-      final String fileName =
-          'image_${DateTime.now().millisecondsSinceEpoch}.png';
-      if (kIsWeb) {
-        final blob = html.Blob([antialiasedBytes], 'image/png');
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.AnchorElement(href: url)
-          ..download = fileName
-          ..style.display = 'none';
-        html.document.body!.append(anchor);
-        anchor.click();
-        anchor.remove();
-        html.Url.revokeObjectUrl(url);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Download initiated as $fileName'),
-          ),
-        );
-      } else {
-        final Directory directory = await getApplicationDocumentsDirectory();
-        final String filePath = '${directory.path}/$fileName';
-        final File file = File(filePath);
-        await file.writeAsBytes(antialiasedBytes);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Image saved to $filePath'),
-          ),
-        );
-      }
+
+      // Get the documents directory.
+      final Directory directory = await getApplicationDocumentsDirectory();
+      final String filePath =
+          '${directory.path}/image_${DateTime.now().millisecondsSinceEpoch}.png';
+      final File file = File(filePath);
+      await file.writeAsBytes(antialiasedBytes);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Image saved to $filePath')),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to save image: $e'),
-        ),
+        SnackBar(content: Text('Failed to save image: $e')),
       );
     }
   }
@@ -340,40 +334,66 @@ class _ImageColorSwapAppState extends State<ImageColorSwapApp> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Flood Fill with Posterization')),
-      body: Center(
-        child: displayedImageBytes == null
-            ? CircularProgressIndicator()
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 300,
-                    child: Slider(
-                      value: tolerance,
-                      min: 0,
-                      max: 120,
-                      divisions: 120,
-                      label: tolerance.toStringAsFixed(1),
-                      onChanged: (value) {
-                        setState(() {
-                          tolerance = value;
-                        });
-                      },
-                    ),
-                  ),
-                  GestureDetector(
-                    onTapDown: (details) => onImageTap(context, details),
-                    child: Image.memory(
-                      displayedImageBytes!,
-                      key: _imageKey,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ],
-              ),
+      appBar: AppBar(
+        title: Text('Image Color Swap'),
+        actions: [
+          // Button to pick an image from disk.
+          IconButton(
+            icon: Icon(Icons.folder_open),
+            tooltip: 'Pick Image',
+            onPressed: pickImage,
+          ),
+        ],
       ),
-      // Two Floating Action Buttons: one to apply blur, one to download.
+      body: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Text(
+                  'Tolerance: ${tolerance.toStringAsFixed(1)}',
+                  style: TextStyle(fontSize: 16),
+                ),
+                Slider(
+                  value: tolerance,
+                  min: 0,
+                  max: 255,
+                  divisions: 255,
+                  label: tolerance.toStringAsFixed(1),
+                  onChanged: (double newTolerance) {
+                    setState(() {
+                      tolerance = newTolerance;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: displayedImageBytes == null
+                  ? Text(
+                      'No image selected.\nTap the folder icon above to load an image.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 18),
+                    )
+                  : GestureDetector(
+                      onTapDown: (details) => onImageTap(context, details),
+                      child: Image.memory(
+                        displayedImageBytes!,
+                        key: _imageKey,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+      // Three Floating Action Buttons:
+      // 1. Apply Gaussian Blur (preview)
+      // 2. Download (save) the image
+      // 3. (Optionally, you could add another button for additional features)
       floatingActionButton: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
