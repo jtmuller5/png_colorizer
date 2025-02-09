@@ -1,0 +1,1 @@
+Always use trailing commas in argument lists and arrays.
