@@ -18,7 +18,7 @@ class PngColorizer extends StatefulWidget {
 }
 
 class _PngColorizerState extends State<PngColorizer> {
- imgLib.Image? originalImage;
+  imgLib.Image? originalImage;
   Uint8List? displayedImageBytes;
 
   // GlobalKey attached to the Image widget to get its RenderBox.
@@ -327,42 +327,48 @@ class _PngColorizerState extends State<PngColorizer> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Image Color Swap'),
-        actions: [
-          // Button to pick an image from disk.
-          IconButton(
-            icon: Icon(Icons.folder_open),
-            tooltip: 'Pick Image',
-            onPressed: pickImage,
-          ),
-        ],
-      ),
-      body: Column(
+      body: Row(
         children: [
-          Padding(
-            padding: EdgeInsets.all(16),
+          SizedBox(
+            width: 250,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'Tolerance: ${tolerance.toStringAsFixed(1)}',
-                  style: TextStyle(fontSize: 16),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: OutlinedButton.icon(
+                    onPressed: pickImage,
+                    icon: Icon(Icons.folder_open),
+                    label: Text('Load Image'),
+                  ),
                 ),
-                Slider(
-                  value: tolerance,
-                  min: 0,
-                  max: 255,
-                  divisions: 255,
-                  label: tolerance.toStringAsFixed(1),
-                  onChanged: (double newTolerance) {
-                    setState(() {
-                      tolerance = newTolerance;
-                    });
-                  },
+                Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Tolerance: ${tolerance.toStringAsFixed(1)}',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                      Slider(
+                        value: tolerance,
+                        min: 0,
+                        max: 255,
+                        divisions: 255,
+                        label: tolerance.toStringAsFixed(1),
+                        onChanged: (double newTolerance) {
+                          setState(() {
+                            tolerance = newTolerance;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
+          VerticalDivider(width: 2),
           Expanded(
             child: Center(
               child: displayedImageBytes == null
@@ -405,5 +411,4 @@ class _PngColorizerState extends State<PngColorizer> {
       ),
     );
   }
-
 }

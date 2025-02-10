@@ -180,63 +180,70 @@ ${newElements.join('\n')}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('SVG Colorizer'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.folder_open),
-            tooltip: 'Select SVG File',
-            onPressed: pickSvgFile,
-          ),
-        ],
-      ),
       body: Row(
         children: [
           // Left panel: List of SVG components.
           Material(
             child: SizedBox(
               width: 250,
-              child: ListView.builder(
-                itemCount: svgElements.length,
-                itemBuilder: (context, index) {
-                  final comp = svgElements[index];
-                  final node = xml.XmlDocument.parse(comp).rootElement;
-                  Color displayColor = Color(
-                    int.parse(
-                      node.getAttribute('fill')?.replaceFirst('#', '0xff') ??
-                          '0xffffffff',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: OutlinedButton.icon(
+                      icon: Icon(Icons.file_upload),
+                      label: Text('Load SVG File'),
+                      onPressed: pickSvgFile,
                     ),
-                  );
-                  // Wrap the ListTile in a MouseRegion to detect hover events.
-                  return MouseRegion(
-                    onEnter: (_) {
-                      setState(() {
-                        hoveredIndex = index;
-                      });
-                    },
-                    onExit: (_) {
-                      setState(() {
-                        hoveredIndex = null;
-                      });
-                    },
-                    child: ListTile(
-                      title: Text('${node.name.local}'),
-                      hoverColor: Colors.yellow[100],
-                      trailing: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: displayColor,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.black38),
-                        ),
-                      ),
-                      onTap: () {
-                        pickColorForComponent(node, index);
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: svgElements.length,
+                      itemBuilder: (context, index) {
+                        final comp = svgElements[index];
+                        final node = xml.XmlDocument.parse(comp).rootElement;
+                        Color displayColor = Color(
+                          int.parse(
+                            node
+                                    .getAttribute('fill')
+                                    ?.replaceFirst('#', '0xff') ??
+                                '0xffffffff',
+                          ),
+                        );
+                        // Wrap the ListTile in a MouseRegion to detect hover events.
+                        return MouseRegion(
+                          onEnter: (_) {
+                            setState(() {
+                              hoveredIndex = index;
+                            });
+                          },
+                          onExit: (_) {
+                            setState(() {
+                              hoveredIndex = null;
+                            });
+                          },
+                          child: ListTile(
+                            title: Text('${node.name.local}'),
+                            hoverColor: Colors.yellow[100],
+                            trailing: Container(
+                              width: 30,
+                              height: 30,
+                              decoration: BoxDecoration(
+                                color: displayColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.black38),
+                              ),
+                            ),
+                            onTap: () {
+                              pickColorForComponent(node, index);
+                            },
+                          ),
+                        );
                       },
                     ),
-                  );
-                },
+                  ),
+                ],
               ),
             ),
           ),

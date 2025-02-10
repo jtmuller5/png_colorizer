@@ -33,6 +33,7 @@ class _ImageColorSwapAppState extends State<ImageColorSwapApp> {
           },
           title: Text('Mode: ${mode.toUpperCase()}'),
         ),
+        Divider(height: 2),
         Expanded(
           child: mode == 'png' ? PngColorizer() : SvgColorizer(),
         ),
