@@ -134,7 +134,7 @@ class _SvgColorizerState extends State<SvgColorizer> {
         try {
           final element = xml.XmlDocument.parse(elementStr).rootElement;
           // Temporarily set the fill to yellow (you can choose any highlight color).
-          element.setAttribute('fill', colorToHex(Colors.yellow));
+          element.setAttribute('fill', colorToHex(Colors.limeAccent));
           elementStr = element.toXmlString();
         } catch (e) {
           print('Error applying highlight to element: $e');
@@ -193,49 +193,51 @@ ${newElements.join('\n')}
       body: Row(
         children: [
           // Left panel: List of SVG components.
-          Container(
-            width: 250,
-            color: Colors.grey[200],
-            child: ListView.builder(
-              itemCount: svgElements.length,
-              itemBuilder: (context, index) {
-                final comp = svgElements[index];
-                final node = xml.XmlDocument.parse(comp).rootElement;
-                Color displayColor = Color(
-                  int.parse(
-                    node.getAttribute('fill')?.replaceFirst('#', '0xff') ??
-                        '0xffffffff',
-                  ),
-                );
-                // Wrap the ListTile in a MouseRegion to detect hover events.
-                return MouseRegion(
-                  onEnter: (_) {
-                    setState(() {
-                      hoveredIndex = index;
-                    });
-                  },
-                  onExit: (_) {
-                    setState(() {
-                      hoveredIndex = null;
-                    });
-                  },
-                  child: ListTile(
-                    title: Text('${node.name.local}'),
-                    trailing: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: displayColor,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.black38),
-                      ),
+          Material(
+            child: SizedBox(
+              width: 250,
+              child: ListView.builder(
+                itemCount: svgElements.length,
+                itemBuilder: (context, index) {
+                  final comp = svgElements[index];
+                  final node = xml.XmlDocument.parse(comp).rootElement;
+                  Color displayColor = Color(
+                    int.parse(
+                      node.getAttribute('fill')?.replaceFirst('#', '0xff') ??
+                          '0xffffffff',
                     ),
-                    onTap: () {
-                      pickColorForComponent(node, index);
+                  );
+                  // Wrap the ListTile in a MouseRegion to detect hover events.
+                  return MouseRegion(
+                    onEnter: (_) {
+                      setState(() {
+                        hoveredIndex = index;
+                      });
                     },
-                  ),
-                );
-              },
+                    onExit: (_) {
+                      setState(() {
+                        hoveredIndex = null;
+                      });
+                    },
+                    child: ListTile(
+                      title: Text('${node.name.local}'),
+                      hoverColor: Colors.yellow[100],
+                      trailing: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: displayColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.black38),
+                        ),
+                      ),
+                      onTap: () {
+                        pickColorForComponent(node, index);
+                      },
+                    ),
+                  );
+                },
+              ),
             ),
           ),
           VerticalDivider(width: 1),
