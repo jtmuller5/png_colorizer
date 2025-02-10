@@ -26,6 +26,9 @@ class _SvgColorizerState extends State<SvgColorizer> {
   // (Optional) Additional mapping if needed.
   Map<String, String> colorMapping = {};
 
+  // List of recently used colors.
+  List<Color> recentColors = [];
+
   // Tracks which element index is being hovered (null if none).
   int? hoveredIndex;
 
@@ -86,36 +89,88 @@ class _SvgColorizerState extends State<SvgColorizer> {
         node.getAttribute('fill')?.replaceFirst('#', '0xff') ?? '0xffffffff',
       ),
     );
+
     Color selectedColor = initialColor;
+
     await showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text('Pick Color for ${node.name.local}'),
-          content: SingleChildScrollView(
-            child: ColorPicker(
-              pickerColor: initialColor,
-              onColorChanged: (color) {
-                selectedColor = color;
-              },
-              showLabel: true,
-              pickerAreaHeightPercent: 0.8,
+        return StatefulBuilder(builder: (context, setStateDialog) {
+          return AlertDialog(
+            title: Text('Pick Color for ${node.name.local}'),
+            content: SingleChildScrollView(
+              child: Column(
+                children: [
+                  ColorPicker(
+                    pickerColor: selectedColor,
+                    onColorChanged: (color) {
+                      setStateDialog(() {
+                        selectedColor = color;
+                      });
+                    },
+                    showLabel: true,
+                    pickerAreaHeightPercent: 0.8,
+                  ),
+                  SizedBox(height: 10),
+                  // Recently used colors.
+                  if (recentColors.isNotEmpty) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Recent Colors:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: recentColors.map((color) {
+                        return GestureDetector(
+                          onTap: () {
+                            setStateDialog(() {
+                              selectedColor = color;
+                            });
+                          },
+                          child: Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.black38),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              child: Text('Select'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
+            actions: [
+              TextButton(
+                child: Text('Select'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          );
+        });
       },
     );
     setState(() {
       final hexColor = colorToHex(selectedColor);
       node.setAttribute('fill', hexColor);
+
+      if (!recentColors.contains(selectedColor)) {
+        setState(() {
+          recentColors.insert(0, selectedColor);
+          if (recentColors.length > 5) {
+            recentColors = recentColors.sublist(0, 5);
+          }
+        });
+      }
       // Update the saved element string.
       svgElements[index] = node.toXmlString();
     });
@@ -252,15 +307,21 @@ ${newElements.join('\n')}
           Expanded(
             child: SingleChildScrollView(
               child: Container(
-                padding: EdgeInsets.all(8),
-                child: SvgPicture.string(
-                  getEditedSvgString(),
-                  placeholderBuilder: (context) =>
-                      Center(child: CircularProgressIndicator()),
-                  errorBuilder: (context, error, stackTrace) {
-                    return Center(child: Text('Error loading SVG: $error'));
-                  },
-                ),
+                padding: EdgeInsets.all(16),
+                child: rootAttributes != null
+                    ? FittedBox(
+                        fit: BoxFit.contain,
+                        child: SvgPicture.string(
+                          getEditedSvgString(),
+                          placeholderBuilder: (context) =>
+                              Center(child: CircularProgressIndicator()),
+                          errorBuilder: (context, error, stackTrace) {
+                            return Center(
+                                child: Text('Error loading SVG: $error'));
+                          },
+                        ),
+                      )
+                    : Container(),
               ),
             ),
           ),
